@@ -17,7 +17,7 @@ st.set_page_config(
     page_title="Hotel Booking Analytics",
     page_icon="🏨",
     layout="wide",
-    initial_sidebar_state="auto"
+    initial_sidebar_state="expanded"
 )
 
 # ── Global Styles ──────────────────────────────────────────────────────────────
