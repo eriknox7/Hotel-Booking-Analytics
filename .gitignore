@@ -1,0 +1,8 @@
+# Jupyter notebooks
+*.ipynb
+
+# CSV files
+*.csv
+
+# Visuals folder (if your folder is named "Visuals")
+Visuals/
