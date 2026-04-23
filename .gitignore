@@ -9,3 +9,6 @@ Visuals/
 
 # Images
 *.png
+
+# Docs
+*.pdf

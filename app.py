@@ -236,7 +236,7 @@ PALETTE  = [GOLD, RED, GREEN, BLUE, '#A78BFA', '#F472B6']
 # ── Data Loading ───────────────────────────────────────────────────────────────
 @st.cache_data
 def load_data():
-    xl       = pd.ExcelFile('Datasets_Hotel_Project.xlsx')
+    xl       = pd.ExcelFile('extracted_data.xlsx')
     guests   = xl.parse('guests')
     hotels   = xl.parse('hotels')
     rooms    = xl.parse('rooms')
