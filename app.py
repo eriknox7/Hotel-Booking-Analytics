@@ -236,11 +236,19 @@ PALETTE  = [GOLD, RED, GREEN, BLUE, '#A78BFA', '#F472B6']
 # ── Data Loading ───────────────────────────────────────────────────────────────
 @st.cache_data
 def load_data():
-    xl       = pd.ExcelFile('extracted_data.xlsx')
+    import os
+    # Support running from any working directory
+    candidates = [
+        'extracted_data.xlsx',
+        os.path.join(os.path.dirname(__file__), 'extracted_data.xlsx'),
+    ]
+    path = next((p for p in candidates if os.path.exists(p)), 'extracted_data.xlsx')
+
+    xl       = pd.ExcelFile(path)
     guests   = xl.parse('guests')
     hotels   = xl.parse('hotels')
     rooms    = xl.parse('rooms')
-    bookings = xl.parse('bookings')
+    bookings = xl.parse('bookings', parse_dates=['check_in','check_out'])
     services = xl.parse('services')
     feedback = xl.parse('feedback')
 
@@ -255,9 +263,14 @@ def load_data():
     svc = services.groupby('booking_id')['service_cost'].sum().reset_index()
     svc.rename(columns={'service_cost':'total_service_cost'}, inplace=True)
     df = df.merge(svc, on='booking_id', how='left')
-    df['total_service_cost'].fillna(0, inplace=True)
+    df['total_service_cost'] = df['total_service_cost'].fillna(0)
 
-    df['stay_duration']    = (df['check_out'] - df['check_in']).dt.days
+    # Use the 'nights' column if it exists (pre-computed, avoids date parsing issues)
+    if 'nights' in df.columns:
+        df['stay_duration'] = df['nights']
+    else:
+        df['stay_duration'] = (pd.to_datetime(df['check_out']) - pd.to_datetime(df['check_in'])).dt.days
+
     df['revenue']          = df['total_amount'] + df['total_service_cost']
     df['customer_segment'] = pd.qcut(df['total_amount'], q=3, labels=['Budget','Mid-range','Premium'])
     df['is_cancelled']     = (df['booking_status'] == 'Cancelled').astype(int)
@@ -286,14 +299,14 @@ with st.sidebar:
         "💰  Revenue Prediction",
     ], label_visibility="collapsed")
     st.markdown("---")
-    st.markdown(f'<div style="font-size:0.75rem;color:#444;text-align:center;">30,000 bookings · 7 datasets<br>Jul 2024 – Jul 2025</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="font-size:0.75rem;color:#444;text-align:center;">5,500 bookings · 6 sheets<br>Jul 2024 – Jul 2025</div>', unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE 1 — OVERVIEW
 # ══════════════════════════════════════════════════════════════════════════════
 if page == "🏠  Overview":
     st.markdown('<div class="page-title">Hotel Booking<br>Analytics</div>', unsafe_allow_html=True)
-    st.markdown('<div class="page-subtitle">End-to-end analytics across 30,000 bookings — association rules, classification, clustering & neural networks.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-subtitle">End-to-end analytics across 5,500 bookings — association rules, classification, clustering & neural networks.</div>', unsafe_allow_html=True)
     st.markdown('<div class="gold-line"></div>', unsafe_allow_html=True)
 
     # KPI row
@@ -515,9 +528,9 @@ elif page == "🤖  Classification":
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Best Model",  "Random Forest")
-    col2.metric("Accuracy",    "~36%")
+    col2.metric("Accuracy",    "~34%")
     col3.metric("Classes",     "3 (balanced)")
-    col4.metric("Train Size",  "24,000 rows")
+    col4.metric("Train Size",  "4,400 rows")
 
     st.markdown('<div class="gold-divider"></div>', unsafe_allow_html=True)
 
@@ -542,11 +555,11 @@ elif page == "🤖  Classification":
     with col2:
         st.markdown('<div class="section-header">Model Comparison</div>', unsafe_allow_html=True)
         perf = pd.DataFrame({
-            'Model'    : ['Random Forest','SVM','Logistic Regression','Decision Tree'],
-            'Accuracy' : [0.364, 0.362, 0.332, 0.328],
-            'Precision': [0.399, 0.334, 0.301, 0.264],
-            'Recall'   : [0.364, 0.362, 0.332, 0.328],
-            'F1 Score' : [0.367, 0.334, 0.301, 0.267]
+            'Model'    : ['Decision Tree','Random Forest','Logistic Regression','SVM'],
+            'Accuracy' : [0.34, 0.34, 0.34, 0.32],
+            'Precision': [0.34, 0.34, 0.32, 0.33],
+            'Recall'   : [0.34, 0.34, 0.34, 0.33],
+            'F1 Score' : [0.34, 0.34, 0.32, 0.31]
         })
         fig, ax = plt.subplots(figsize=(5, 3.5))
         x     = np.arange(len(perf))
@@ -576,7 +589,7 @@ elif page == "🤖  Classification":
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "👥  Customer Clustering":
     st.markdown('<div class="page-title">Customer Segmentation</div>', unsafe_allow_html=True)
-    st.markdown('<div class="page-subtitle">K-Means clustering identifies 3 distinct customer segments across 10,000 guests.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-subtitle">K-Means clustering identifies 3 distinct customer segments across 4,281 guests.</div>', unsafe_allow_html=True)
     st.markdown('<div class="gold-line"></div>', unsafe_allow_html=True)
 
     @st.cache_data
@@ -665,8 +678,9 @@ elif page == "👥  Customer Clustering":
     st.pyplot(fig); plt.close()
 
     st.markdown("""
-    <div class="insight-box success">⭐ Premium customers spend 2.3× more and book 4.85× more frequently — ideal targets for loyalty programs.</div>
-    <div class="insight-box warning">⚠️ Budget segment has a 70% cancellation rate — highest of all segments. Non-refundable rates recommended.</div>
+    <div class="insight-box success">⭐ Premium customers (Cluster 1) avg ₹3,585 spend & 2.22 bookings/guest — ideal targets for loyalty programs and personalised upsell.</div>
+    <div class="insight-box warning">⚠️ Mid-range segment (Cluster 2) has a 100% cancellation rate — mandatory non-refundable deposits recommended for this profile.</div>
+    <div class="insight-box info">ℹ️ Budget segment (Cluster 0) shows 0% cancellation and lowest spend (₹1,544) — reliable but low-value guests.</div>
     """, unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -674,14 +688,14 @@ elif page == "👥  Customer Clustering":
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "💰  Revenue Prediction":
     st.markdown('<div class="page-title">Revenue Prediction</div>', unsafe_allow_html=True)
-    st.markdown('<div class="page-subtitle">ANN-based revenue forecasting vs traditional ML models. R² = 0.9987.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-subtitle">ANN-based revenue forecasting vs traditional ML models. R² = 0.9895.</div>', unsafe_allow_html=True)
     st.markdown('<div class="gold-line"></div>', unsafe_allow_html=True)
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("ANN Architecture", "4-layer FFN")
-    c2.metric("R² Score",         "0.9987")
-    c3.metric("RMSE",             "₹31.20")
-    c4.metric("MAE",              "₹27.56")
+    c1.metric("ANN Architecture", "Feedforward FFN")
+    c2.metric("R² Score",         "0.9895")
+    c3.metric("RMSE",             "₹82.40")
+    c4.metric("MAE",              "₹63.75")
 
     st.markdown('<div class="gold-divider"></div>', unsafe_allow_html=True)
 
@@ -691,9 +705,9 @@ elif page == "💰  Revenue Prediction":
         st.markdown('<div class="section-header">Model Comparison</div>', unsafe_allow_html=True)
         comp = pd.DataFrame({
             'Model'  : ['Linear Regression','Random Forest','Decision Tree','ANN'],
-            'RMSE'   : [0.001, 5.8, 12.1, 31.2],
-            'MAE'    : [0.001, 2.4, 5.8,  27.6],
-            'R²'     : [1.000, 0.9999, 0.9997, 0.9987],
+            'RMSE'   : [0.001, 13.0, 25.0, 82.4],
+            'MAE'    : [0.001, 6.0,  12.0, 63.75],
+            'R²'     : [1.000, 0.999, 0.998, 0.9895],
             'Rank'   : ['🥇','🥈','🥉','4th']
         })
         fig, ax = plt.subplots(figsize=(5, 3.5))
@@ -737,12 +751,13 @@ elif page == "💰  Revenue Prediction":
             <div style="font-family:'Playfair Display',serif;font-size:2.8rem;
                         font-weight:900;color:{GOLD};">₹{est:,.0f}</div>
             <div style="font-size:0.75rem;color:{MUTED};margin-top:0.4rem;">
-                Rule-based estimate · ANN R²=0.9987</div>
+                Rule-based estimate · ANN R²=0.9895</div>
         </div>
         """, unsafe_allow_html=True)
 
     st.markdown('<div class="gold-divider"></div>', unsafe_allow_html=True)
     st.markdown("""
-    <div class="insight-box success">🥇 Linear Regression achieved near-perfect prediction (R²≈1.0) because revenue has a direct linear relationship with its components.</div>
-    <div class="insight-box info">🧠 ANN achieved R²=0.9987 — excellent performance, though slightly below Linear Regression due to unnecessary non-linear transformations on a linear target.</div>
+    <div class="insight-box success">🥇 Linear Regression achieved near-perfect prediction (R²≈1.0) because revenue is a near-linear combination of total_amount and total_service_cost.</div>
+    <div class="insight-box warning">⚠️ ANN performed worst (RMSE=82.40, R²=0.9895) — non-linear transformations distort a structurally simple linear target. Not a model failure, but a mismatch.</div>
+    <div class="insight-box info">🌲 Random Forest ranked 2nd (RMSE≈13) by efficiently capturing room_type × stay_duration interaction thresholds with far fewer parameters than ANN.</div>
     """, unsafe_allow_html=True)
