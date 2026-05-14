@@ -7,7 +7,7 @@
 ![Pandas](https://img.shields.io/badge/Pandas-150458?style=for-the-badge&logo=pandas&logoColor=white)
 ![Jupyter](https://img.shields.io/badge/Jupyter-F37626?style=for-the-badge&logo=jupyter&logoColor=white)
 
-> End-to-end analytics on 30,000 hotel bookings — association rules, classification, clustering, and ANN-based revenue prediction.
+> End-to-end analytics on 5,500 hotel bookings — association rules, classification, clustering, and ANN-based revenue prediction.
 
 ---
 
